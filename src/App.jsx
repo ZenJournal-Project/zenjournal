@@ -1,3 +1,4 @@
+// src/App.jsx
 import React from "react";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Routes, Route, Navigate } from "react-router-dom";
