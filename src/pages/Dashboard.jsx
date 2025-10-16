@@ -1,6 +1,7 @@
 // src/pages/Dashboard.jsx
 import React, { useEffect, useState } from "react";
 import { JournalAPI } from "../services/apiclient";
+import { Link } from "react-router-dom"; // Added for Edit link
 
 // --- helpers to read/sort/format dates from various shapes ---
 function extractDate(j) {
@@ -25,6 +26,16 @@ function fmtDate(j) {
   const d = extractDate(j);
   return d ? d.toLocaleString() : "—";
 }
+
+/* === ADDED START: local-day comparator used for “Today’s mood” chip === */
+function isSameLocalDay(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+/* === ADDED END === */
 
 export default function Dashboard() {
   const [journals, setJournals] = useState([]);
@@ -59,6 +70,14 @@ export default function Dashboard() {
     };
   }, []);
 
+  /* === ADDED START: compute today’s latest entry (list is newest→oldest) === */
+  const today = new Date();
+  const todaysEntry = journals.find((j) => {
+    const d = extractDate(j);
+    return d && isSameLocalDay(d, today);
+  });
+  /* === ADDED END === */
+
   async function handleDelete(j) {
     const id = j.id || j.entry_id || j._id;
     if (!id) return alert("Entry id missing.");
@@ -84,6 +103,33 @@ export default function Dashboard() {
         <p className="text-gray-600">Your recent journal entries</p>
       </header>
 
+      {/* === ADDED START: “Today’s mood” chip/banner === */}
+      <section className="p-3 rounded-xl border shadow-sm bg-white/70">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm text-gray-600">Today’s mood</div>
+          {todaysEntry ? (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-gray-200 capitalize">
+                {todaysEntry.mood || "—"}
+              </span>
+              <Link
+                to={`/entry/${todaysEntry.id || todaysEntry.entry_id || todaysEntry._id}`}
+                className="text-xs rounded-md px-2 py-1 ring-1 ring-gray-300 hover:bg-gray-50"
+                title="Edit today's entry"
+              >
+                Edit
+              </Link>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-500">No entry yet today</span>
+          )}
+        </div>
+        {todaysEntry && todaysEntry.text && (
+          <p className="mt-1 text-xs text-gray-500 line-clamp-1">{todaysEntry.text}</p>
+        )}
+      </section>
+      {/* === ADDED END === */}
+
       <section className="p-4 rounded-xl border shadow-sm">
         <h2 className="text-xl font-medium mb-3">Recent Entries</h2>
 
@@ -103,14 +149,27 @@ export default function Dashboard() {
                 <li key={id} className="p-3 border rounded-md">
                   <div className="flex items-center justify-between text-sm text-gray-500">
                     <span>{fmtDate(j)}</span>
-                    <button
-                      onClick={() => handleDelete(j)}
-                      disabled={isBusy}
-                      className="ml-3 rounded-md px-2 py-1 text-xs ring-1 ring-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
-                      title="Delete entry"
-                    >
-                      {isBusy ? "Deleting…" : "Delete"}
-                    </button>
+
+                    {/* === UPDATED START: Edit button/link added === */}
+                    <div className="flex items-center gap-2">
+                      <Link
+                        to={`/entry/${id}`}
+                        className="rounded-md px-2 py-1 text-xs ring-1 ring-gray-300 hover:bg-gray-50"
+                        title="Edit entry"
+                      >
+                        Edit
+                      </Link>
+                      {/* existing Delete button */}
+                      <button
+                        onClick={() => handleDelete(j)}
+                        disabled={isBusy}
+                        className="rounded-md px-2 py-1 text-xs ring-1 ring-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        title="Delete entry"
+                      >
+                        {isBusy ? "Deleting…" : "Delete"}
+                      </button>
+                    </div>
+                    {/* === UPDATED END === */}
                   </div>
 
                   <div className="mt-1 font-medium capitalize">

@@ -33,6 +33,8 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Create new */}
           <Route
             path="/entry"
             element={
@@ -41,6 +43,17 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* === BEGIN: Edit route added === */}
+          <Route
+            path="/entry/:id"
+            element={
+              <ProtectedRoute>
+                <EntryPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* === END: Edit route added === */}
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
