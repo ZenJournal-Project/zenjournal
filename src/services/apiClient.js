@@ -29,7 +29,14 @@ export const JournalAPI = {
   list: () => api.get("/api/journals"),
   create: (payload) => api.post("/api/journals", payload),
   get: (id) => api.get(`/api/journals/${id}`),
-  update: (id, payload) => api.put(`/api/journals/${id}`, payload),
+
+  // UPDATED START: force the PUT body to be exactly { text, mood, tags }
+  update: (id, payload = {}) => {
+    const { text, mood, tags } = payload;
+    return api.put(`/api/journals/${id}`, { text, mood, tags: Array.isArray(tags) ? tags : [] });
+  },
+  // UPDATED END
+
   remove: (id) => api.delete(`/api/journals/${id}`),
 };
 

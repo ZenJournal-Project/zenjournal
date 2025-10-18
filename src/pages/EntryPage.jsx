@@ -1,18 +1,55 @@
 // src/pages/EntryPage.jsx
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { JournalAPI } from "../services/apiclient";
 
+// Fixed set of moods for the chip selector
 const moods = ["happy", "neutral", "sad", "angry", "anxious"];
 
 export default function EntryPage() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEdit = useMemo(() => Boolean(id), [id]);
+
+  // --- form state ---
   const [text, setText] = useState("");
   const [mood, setMood] = useState("");
-  const [tags, setTags] = useState(""); // comma-separated input
+  const [tags, setTags] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
+  // Keep the original entry only to prefill (not sent back)
+  const [original, setOriginal] = useState(null);
+
+  // Prefill the form when editing
+  useEffect(() => {
+    let mounted = true;
+    if (!isEdit) return;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setErr("");
+        const { data } = await JournalAPI.get(id); // GET /api/journals/:id
+        if (!mounted || !data) return;
+        setOriginal(data);
+        setText(data.text || "");
+        setMood(data.mood || "");
+        setTags(Array.isArray(data.tags) ? data.tags.join(", ") : (data.tags || ""));
+      } catch (e) {
+        if (mounted) {
+          console.error("Load entry failed:", e?.response?.data || e);
+          setErr(e?.response?.data?.message || "Failed to load entry.");
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => { mounted = false; };
+  }, [id, isEdit]);
+
+  // === UPDATED START: PUT-only edit; POST for create (no fallback needed) ===
   const onSubmit = async (e) => {
     e.preventDefault();
     setErr("");
@@ -20,31 +57,43 @@ export default function EntryPage() {
     if (!text.trim()) return setErr("Please write something.");
     if (!mood) return setErr("Please select your mood.");
 
+    const tagsArray = tags.split(",").map(t => t.trim()).filter(Boolean);
+
     try {
       setLoading(true);
-      const payload = {
-        text: text.trim(),
-        mood,
-        tags: tags
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
-        timestamp: Date.now(), // <— ensure we always have a date
-      };
-      await JournalAPI.create(payload);
+
+      if (isEdit) {
+        // Backend PUT is fixed → send only allowed fields
+        await JournalAPI.update(id, { text: text.trim(), mood, tags: tagsArray });
+      } else {
+        // Create path unchanged
+        await JournalAPI.create({
+          text: text.trim(),
+          mood,
+          tags: tagsArray,
+          timestamp: Date.now(),
+        });
+      }
+
       navigate("/dashboard", { replace: true });
-    } catch (e) {
-      setErr(e?.response?.data?.message || "Failed to save entry.");
+    } catch (e2) {
+      console.error("Save entry failed:", e2?.response?.data || e2);
+      setErr(e2?.response?.data?.message || "Failed to save entry.");
     } finally {
       setLoading(false);
     }
   };
+  // === UPDATED END ===
 
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold">New journal entry</h1>
-        <p className="text-gray-600">Capture your mood and thoughts.</p>
+        <h1 className="text-2xl font-semibold">
+          {isEdit ? "Edit journal entry" : "New journal entry"}
+        </h1>
+        <p className="text-gray-600">
+          {isEdit ? "Update mood, text, or tags." : "Capture your mood and thoughts."}
+        </p>
       </header>
 
       {err && (
@@ -107,7 +156,7 @@ export default function EntryPage() {
             disabled={loading}
             className="rounded-xl bg-black text-white px-4 py-2 disabled:opacity-60"
           >
-            {loading ? "Saving…" : "Save entry"}
+            {loading ? (isEdit ? "Saving…" : "Saving…") : isEdit ? "Save changes" : "Save entry"}
           </button>
           <button
             type="button"
