@@ -15,10 +15,6 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("zen_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
-  // Keep content-type explicit for JSON writes
-  if (["post", "put", "patch"].includes((config.method || "").toLowerCase())) {
-    config.headers["Content-Type"] = "application/json";
-  }
   return config;
 });
 
@@ -35,13 +31,9 @@ export const JournalAPI = {
   get: (id) => api.get(`/api/journals/${id}`),
 
   // UPDATED START: force the PUT body to be exactly { text, mood, tags }
-  update: (id, payload) => {
-    const clean = {
-      text: String(payload?.text ?? "").trim(),
-      mood: String(payload?.mood ?? "").trim(),
-      tags: Array.isArray(payload?.tags) ? payload.tags : [],
-    };
-    return api.put(`/api/journals/${id}`, clean);
+  update: (id, payload = {}) => {
+    const { text, mood, tags } = payload;
+    return api.put(`/api/journals/${id}`, { text, mood, tags: Array.isArray(tags) ? tags : [] });
   },
   // UPDATED END
 

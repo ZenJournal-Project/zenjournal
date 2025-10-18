@@ -49,7 +49,7 @@ export default function EntryPage() {
     return () => { mounted = false; };
   }, [id, isEdit]);
 
-  // Save handler for both Create + Edit
+  // === UPDATED START: PUT-only edit; POST for create (no fallback needed) ===
   const onSubmit = async (e) => {
     e.preventDefault();
     setErr("");
@@ -57,49 +57,22 @@ export default function EntryPage() {
     if (!text.trim()) return setErr("Please write something.");
     if (!mood) return setErr("Please select your mood.");
 
-    // Always send tags as an array (even if empty)
-    const tagsArray = tags
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const tagsArray = tags.split(",").map(t => t.trim()).filter(Boolean);
 
-    // Payloads (kept small and explicit)
-    const editPayload = { text: text.trim(), mood, tags: tagsArray };
-
-    // We keep timestamp on create to preserve your current behavior
-    const createPayload = {
-      text: text.trim(),
-      mood,
-      tags: tagsArray,
-      timestamp: Date.now(),
-    };
-
-    setLoading(true);
     try {
-      if (isEdit) {
-        // === UPDATED START: normal PUT + graceful fallback if server still 405/500 ===
-        try {
-          // Official edit path (mentor API)
-          await JournalAPI.update(id, editPayload); // PUT /api/journals/:id
-        } catch (putErr) {
-          const status = putErr?.response?.status;
-          const shouldFallback = status === 405 || status === 500;
-          if (!shouldFallback) throw putErr; // other errors → bubble
+      setLoading(true);
 
-          // Fallback path: create a new entry, then delete the old one
-          try {
-            const { data: created } = await JournalAPI.create(createPayload); // POST works
-            await JournalAPI.remove(id);                                     // delete old
-            // (Optional: you could store a flag to show "edited via fallback" toast)
-          } catch (fallbackErr) {
-            console.error("Fallback edit failed:", fallbackErr?.response?.data || fallbackErr);
-            throw fallbackErr;
-          }
-        }
-        // === UPDATED END ===
+      if (isEdit) {
+        // Backend PUT is fixed → send only allowed fields
+        await JournalAPI.update(id, { text: text.trim(), mood, tags: tagsArray });
       } else {
-        // Create new entry
-        await JournalAPI.create(createPayload); // POST /api/journals
+        // Create path unchanged
+        await JournalAPI.create({
+          text: text.trim(),
+          mood,
+          tags: tagsArray,
+          timestamp: Date.now(),
+        });
       }
 
       navigate("/dashboard", { replace: true });
@@ -110,6 +83,7 @@ export default function EntryPage() {
       setLoading(false);
     }
   };
+  // === UPDATED END ===
 
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-5">
